@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
 export async function POST(req) {
   try {
@@ -28,9 +29,17 @@ export async function POST(req) {
       { expiresIn: "24h" }
     );
 
+    const cookieStore = await cookies();
+    cookieStore.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: "/",
+    });
+
     return Response.json({
       message: "Login successful",
-      token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
@@ -38,3 +47,4 @@ export async function POST(req) {
     return Response.json({ message: "Server error" }, { status: 500 });
   }
 }
+

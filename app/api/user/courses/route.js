@@ -1,9 +1,13 @@
 import { db } from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 
-export async function GET(req) {
-  const user = verifyToken(req);
-  if (!user) return Response.json({ message: "Unauthorized" }, { status: 401 });
+export async function GET() {
+  let user;
+  try {
+    user = await verifyToken();
+  } catch (error) {
+    return Response.json({ message: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const [rows] = await db.query(
@@ -15,3 +19,4 @@ export async function GET(req) {
     return Response.json({ message: "Database error" }, { status: 500 });
   }
 }
+
