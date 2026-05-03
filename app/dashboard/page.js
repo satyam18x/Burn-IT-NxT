@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PlayCircle, BookOpen, Activity, Users, ArrowRight, Loader2 } from 'lucide-react';
+import { PlayCircle, BookOpen, Activity, Users, ArrowRight, Loader2, CheckCircle2, ChevronDown, ChevronUp, LogOut, Layout, Menu, X } from 'lucide-react';
 import VideoPlayer from '@/components/VideoPlayer';
 
 export default function DashboardPage() {
@@ -14,6 +14,10 @@ export default function DashboardPage() {
   const [youtubeId, setYoutubeId] = useState(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [watchedVideos, setWatchedVideos] = useState([]);
+  const [progressStats, setProgressStats] = useState({ total: 0, watched: 0, percentage: 0 });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [expandedModules, setExpandedModules] = useState({});
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -23,9 +27,38 @@ export default function DashboardPage() {
     }
     const parsedUser = JSON.parse(userStr);
     setUser(parsedUser);
-    // fetchMyCourses is called here directly — no dependency on `user` state
     fetchMyCourses();
+    fetchWatchedVideos();
+
+    // Close sidebar by default on mobile
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
   }, [router]);
+
+  const fetchWatchedVideos = async () => {
+    try {
+      const res = await fetch('/api/user/progress');
+      if (res.ok) {
+        const data = await res.json();
+        setWatchedVideos(data);
+      }
+    } catch (err) {
+      console.error('Fetch progress error:', err);
+    }
+  };
+
+  const fetchProgressStats = async (courseId) => {
+    try {
+      const res = await fetch(`/api/user/progress?courseId=${courseId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProgressStats(data);
+      }
+    } catch (err) {
+      console.error('Fetch stats error:', err);
+    }
+  };
 
   const fetchMyCourses = async () => {
     setLoadingCourses(true);
@@ -54,6 +87,7 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setActiveCourse(data);
+        fetchProgressStats(courseId);
         if (data.modules && data.modules.length > 0) {
           const firstMod = data.modules[0];
           if (firstMod.videos && firstMod.videos.length > 0) {
@@ -64,6 +98,13 @@ export default function DashboardPage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const toggleModule = (modId) => {
+    setExpandedModules(prev => ({
+      ...prev,
+      [modId]: !prev[modId]
+    }));
   };
 
   const handleSelectVideo = async (video) => {
@@ -85,6 +126,26 @@ export default function DashboardPage() {
     }
   };
 
+  const markAsWatched = async (videoId) => {
+    try {
+      const res = await fetch('/api/user/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId })
+      });
+      if (res.ok) {
+        if (!watchedVideos.includes(videoId)) {
+          setWatchedVideos([...watchedVideos, videoId]);
+          if (activeCourse) {
+            fetchProgressStats(activeCourse.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Mark watched error:', err);
+    }
+  };
+
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' });
     localStorage.removeItem('user');
@@ -95,183 +156,314 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div style={{ backgroundColor: 'var(--color-light)', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ backgroundColor: 'var(--color-dark)', color: 'white', padding: '1rem 0' }}>
-        <div className="container dashboard-header-flex">
-          <h2 style={{ fontSize: '1.5rem', color: 'white' }}>Welcome back, {user.name?.split(' ')[0]}!</h2>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
-              {activeCourse ? activeCourse.title : 'My Dashboard'}
-            </span>
-            <button
-              className="btn"
-              style={{ background: 'transparent', border: 'none', color: 'white' }}
-              onClick={handleLogout}
-            >
-              Logout
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden', fontFamily: "'Montserrat', sans-serif" }}>
+      {/* Sidebar for Curriculum */}
+      <div style={{ zIndex: 100, position: 'relative' }}>
+        {/* Overlay for mobile when sidebar is open */}
+        {isSidebarOpen && (
+          <div 
+            onClick={() => setIsSidebarOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              zIndex: 90,
+              display: window.innerWidth < 768 ? 'block' : 'none'
+            }}
+            className="mobile-overlay"
+          />
+        )}
+
+        <aside style={{ 
+          width: '320px', 
+          maxWidth: '85vw',
+          backgroundColor: '#1e293b', 
+          color: 'white', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          transition: 'transform 0.3s ease',
+          transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+          overflow: 'hidden',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          boxShadow: isSidebarOpen ? '4px 0 20px rgba(0,0,0,0.3)' : 'none',
+          zIndex: 100
+        }} className="sidebar">
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.25rem', color: 'white', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <span style={{ color: 'var(--color-primary)' }}>Burn</span> IT
+            </h2>
+            <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }} className="mobile-only">
+              <X size={20} />
             </button>
           </div>
-        </div>
-      </div>
 
-      <div className="container section-padding">
-        {/* My Assigned Courses — shown prominently at the top */}
-        <div className="card" style={{ padding: '2rem', marginBottom: '2rem' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-            <BookOpen color="var(--color-primary)" size={22} />
-            My Assigned Courses
-          </h3>
-
-          {loadingCourses ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', opacity: 0.6 }}>
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-              <span>Loading your courses...</span>
-            </div>
-          ) : courses.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '2.5rem',
-              background: 'var(--color-accent)',
-              borderRadius: '12px',
-              color: 'var(--color-text)'
-            }}>
-              <BookOpen size={40} style={{ opacity: 0.4, marginBottom: '1rem' }} />
-              <h4 style={{ marginBottom: '0.5rem' }}>No Courses Assigned Yet</h4>
-              <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '1.5rem' }}>
-                Your coach hasn't assigned a program to you yet. Check back soon or browse all programs.
-              </p>
-              <button
-                className="btn btn-primary"
-                onClick={() => router.push('/programs')}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+            {/* Course Selector Dropdown (Simplified) */}
+            <div style={{ marginBottom: '2rem' }}>
+              <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>Active Program</label>
+              <select 
+                value={activeCourse?.id || ''} 
+                onChange={(e) => fetchCourseDetails(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  backgroundColor: 'rgba(255,255,255,0.05)', 
+                  color: 'white', 
+                  border: '1px solid rgba(255,255,255,0.1)', 
+                  borderRadius: '8px', 
+                  padding: '0.75rem',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
               >
-                Browse Programs
-              </button>
+                {courses.map(c => <option key={c.id} value={c.id} style={{ color: 'black' }}>{c.title}</option>)}
+              </select>
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-              {courses.map(c => (
-                <div
-                  key={c.id}
-                  onClick={() => router.push('/programs')}
-                  style={{
-                    padding: '1.5rem',
-                    background: 'white',
-                    border: '2px solid var(--color-primary)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '40px', height: '40px',
-                      borderRadius: '10px',
-                      background: 'var(--color-accent)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <PlayCircle color="var(--color-primary)" size={20} />
-                    </div>
-                    <h4 style={{ fontSize: '1rem', fontWeight: '700', lineHeight: '1.3' }}>{c.title}</h4>
-                  </div>
-                  {c.description && (
-                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text)', opacity: 0.8, lineHeight: '1.5' }}>
-                      {c.description.length > 80 ? c.description.slice(0, 80) + '...' : c.description}
-                    </p>
+
+            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', fontWeight: '700', marginBottom: '1rem', display: 'block' }}>Course Curriculum</label>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {activeCourse?.modules?.map((mod) => (
+                <div key={mod.id} style={{ marginBottom: '0.5rem' }}>
+                  <button 
+                    onClick={() => toggleModule(mod.id)}
+                    style={{ 
+                      width: '100%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '0.75rem', 
+                      backgroundColor: 'rgba(255,255,255,0.02)', 
+                      border: 'none', 
+                      color: 'white', 
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{mod.title}</span>
+                    {expandedModules[mod.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  
+                  {expandedModules[mod.id] !== false && (
+                    <ul style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {mod.videos?.map(video => (
+                        <li
+                          key={video.id}
+                          onClick={() => handleSelectVideo(video)}
+                          style={{
+                            padding: '0.75rem 1rem 0.75rem 1.5rem',
+                            fontSize: '0.85rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            backgroundColor: activeVideo?.id === video.id ? 'var(--color-primary)' : 'transparent',
+                            color: activeVideo?.id === video.id ? 'white' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+                          onMouseLeave={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          {watchedVideos.includes(video.id) ? 
+                            <CheckCircle2 size={16} color={activeVideo?.id === video.id ? 'white' : '#4ade80'} /> : 
+                            <PlayCircle size={16} opacity={0.5} />
+                          }
+                          <span style={{ flex: 1 }}>{video.title}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '0.25rem',
-                    color: 'var(--color-primary)', fontWeight: '600', fontSize: '0.85rem', marginTop: 'auto'
-                  }}>
-                    Access Program <ArrowRight size={14} />
-                  </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="dashboard-grid">
-          {/* Left — Video player + module list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '2rem' }}>
-              {activeCourse ? (
-                <>
-                  <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                    <PlayCircle color="var(--color-primary)" />
-                    {activeVideo ? activeVideo.title : 'Select a video'}
-                  </h3>
+          <div style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.5rem', color: 'rgba(255,255,255,0.5)' }}>
+              <span>Your Progress</span>
+              <span>{progressStats.percentage}%</span>
+            </div>
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ width: `${progressStats.percentage}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.5s ease' }}></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* Main Content Area */}
+      <main style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        position: 'relative', 
+        overflowY: 'auto',
+        marginLeft: (isSidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 768) ? '320px' : '0',
+        transition: 'margin-left 0.3s ease'
+      }} className="main-content">
+        {/* Top Header */}
+        <header style={{ 
+          height: '70px', 
+          backgroundColor: 'white', 
+          borderBottom: '1px solid #e2e8f0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          padding: '0 2rem',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50
+        }} className="top-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}>
+              {isSidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 768 ? <X size={24} /> : <Menu size={24} />}
+            </button>
+            <h1 style={{ fontSize: '1rem', fontWeight: '700', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+              {activeCourse ? activeCourse.title : 'Dashboard'}
+            </h1>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }} className="desktop-only">
+              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e293b' }}>{user.name}</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Student</span>
+            </div>
+            <button 
+              onClick={handleLogout}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem', 
+                padding: '0.5rem 1rem', 
+                borderRadius: '8px', 
+                border: '1px solid #e2e8f0', 
+                backgroundColor: 'white', 
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                color: '#ef4444'
+              }}
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </div>
+        </header>
+
+        {/* Video & Content Area */}
+        <div style={{ flex: 1, padding: '1rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }} className="content-container">
+          {activeCourse ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {/* Video Player Card */}
+              <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: 'black' }}>
                   <VideoPlayer youtubeId={youtubeId} userEmail={user.email} />
                   {loadingVideo && (
-                    <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem', opacity: 0.7 }}>
-                      Loading secure stream...
-                    </p>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10 }}>
+                      <Loader2 size={40} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+                    </div>
                   )}
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '3rem 0', opacity: 0.5 }}>
-                  <PlayCircle size={48} style={{ marginBottom: '1rem' }} />
-                  <h3>Select a course above to start watching</h3>
                 </div>
-              )}
-            </div>
+                
+                <div style={{ padding: '1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '1rem' }} className="video-info-header">
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', marginBottom: '0.25rem' }}>
+                      {activeVideo ? activeVideo.title : 'Select a lesson'}
+                    </h2>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Module: {activeCourse.modules.find(m => m.videos.find(v => v.id === activeVideo?.id))?.title || 'General'}</p>
+                  </div>
+                  
+                  <button 
+                    className="btn" 
+                    onClick={() => activeVideo && markAsWatched(activeVideo.id)}
+                    disabled={!activeVideo || watchedVideos.includes(activeVideo?.id)}
+                    style={{ 
+                      background: watchedVideos.includes(activeVideo?.id) ? '#10b981' : 'var(--color-primary)', 
+                      color: 'white',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 14px rgba(255, 106, 0, 0.25)',
+                      width: '100%',
+                      maxWidth: '300px'
+                    }}
+                  >
+                    {watchedVideos.includes(activeVideo?.id) ? <><CheckCircle2 size={18} /> Completed</> : 'Mark as Completed'}
+                  </button>
+                </div>
 
-            {activeCourse?.modules?.map((mod) => (
-              <div key={mod.id} className="card" style={{ padding: '2rem' }}>
-                <h4 style={{ marginBottom: '1rem', color: 'var(--color-primary)' }}>{mod.title}</h4>
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {mod.videos?.map(video => (
-                    <li
-                      key={video.id}
-                      onClick={() => handleSelectVideo(video)}
-                      style={{
-                        padding: '1rem',
-                        background: activeVideo?.id === video.id ? 'var(--color-accent)' : 'white',
-                        border: '1px solid rgba(0,0,0,0.1)',
-                        borderRadius: '8px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {video.title}
-                    </li>
-                  ))}
-                </ul>
+                <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#334155', marginBottom: '1rem' }}>About this lesson</h3>
+                  <p style={{ color: '#64748b', lineHeight: '1.6', fontSize: '0.95rem' }}>
+                    {activeVideo?.description || "In this session, we'll cover the fundamental techniques and principles to help you achieve your fitness goals. Make sure to follow along and stay hydrated throughout the workout."}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Right sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <Activity color="var(--color-primary)" size={20} /> Progress
-              </h4>
-              <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--color-accent)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '2rem', fontWeight: '800' }}>2.5kg</div>
-                <div>Lost so far</div>
+              {/* Extras Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#1e293b' }}>
+                    <Activity color="var(--color-primary)" size={20} /> Today's Goal
+                  </h4>
+                  <div style={{ padding: '1rem', backgroundColor: 'rgba(255,106,0,0.05)', borderRadius: '12px', border: '1px solid rgba(255,106,0,0.1)' }}>
+                    <p style={{ fontSize: '0.95rem', fontWeight: '600', color: '#1e293b' }}>Complete "Day 1 – Full Body Burn"</p>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>Estimated time: 45 minutes</p>
+                  </div>
+                </div>
+
+                <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#1e293b' }}>
+                    <Users color="var(--color-primary)" size={20} /> Community Support
+                  </h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>Join the exclusive WhatsApp group for daily motivation and expert tips.</p>
+                  <button className="btn btn-primary" style={{ width: '100%', background: '#25D366', color: 'white', boxShadow: '0 4px 14px rgba(37, 211, 102, 0.25)' }}>Join WhatsApp Group</button>
+                </div>
               </div>
             </div>
-            <div className="card" style={{ padding: '1.5rem', background: 'var(--color-dark)', color: 'white' }}>
-              <h4 style={{ color: 'white', marginBottom: '1rem' }}>
-                <Users color="var(--color-primary)" size={20} /> Community
-              </h4>
-              <button className="btn btn-primary" style={{ width: '100%' }}>Join Group</button>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '5rem 0' }}>
+              <div style={{ display: 'inline-flex', padding: '2rem', backgroundColor: 'white', borderRadius: '50%', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
+                <Layout size={60} color="var(--color-primary)" />
+              </div>
+              <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#1e293b', marginBottom: '1rem' }}>Your Learning Dashboard</h2>
+              <p style={{ color: '#64748b', maxWidth: '500px', margin: '0 auto 2rem' }}>Select a program from the menu to start your transformation journey today.</p>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => router.push('/programs')}
+                style={{ padding: '0.75rem 2rem' }}
+              >
+                Browse All Programs
+              </button>
             </div>
-          </div>
+          )}
         </div>
-      </div>
+      </main>
+
+      <style jsx global>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @media (max-width: 768px) {
+          .desktop-only { display: none !important; }
+          .mobile-only { display: flex !important; }
+          .main-content { margin-left: 0 !important; }
+          .top-header { padding: 0 1rem !important; }
+          .content-container { padding: 0.5rem !important; }
+        }
+        @media (min-width: 769px) {
+          .video-info-header { flex-direction: row !important; justify-content: space-between !important; align-items: center !important; }
+          .video-info-header button { width: auto !important; }
+        }
+        .mobile-only { display: none; }
+      `}</style>
     </div>
   );
 }
