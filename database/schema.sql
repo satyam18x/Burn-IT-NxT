@@ -99,3 +99,18 @@ INSERT IGNORE INTO `modules` (`id`, `course_id`, `title`, `order_index`) VALUES
 INSERT IGNORE INTO `videos` (`course_id`, `module_id`, `title`, `youtube_id`, `order_index`) VALUES
 (1, 1, 'Welcome & Overview',     'Ez3n8aRRbw4', 1),
 (1, 1, 'Day 1 – Full Body Burn', 'Ez3n8aRRbw4', 2);
+
+-- ------------------------------------------------------------
+-- Table: settings (for global configuration like webinar links)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `settings` (
+  `key_name`    VARCHAR(100) NOT NULL,
+  `value`       TEXT,
+  `updated_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`key_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO `settings` (`key_name`, `value`) VALUES
+('webinar_link', ''),
+('whatsapp_link', '');
+

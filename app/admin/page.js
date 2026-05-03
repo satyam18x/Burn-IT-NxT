@@ -10,6 +10,7 @@ export default function AdminDashboard() {
   const [courses, setCourses] = useState([]);
   const [modules, setModules] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [links, setLinks] = useState({ webinar_link: '', whatsapp_link: '' });
   
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'user' });
   const [newCourse, setNewCourse] = useState({ title: '', description: '', duration: '', includes: '', image: '', recommended: false });
@@ -40,11 +41,50 @@ export default function AdminDashboard() {
     } else if (activeTab === 'courses') {
       fetchCourses();
       fetchAssignments();
+      fetchUsers(); // needed to populate the Assign Course user dropdown
     } else if (activeTab === 'videos') {
       fetchVideos();
       fetchCourses();
+    } else if (activeTab === 'links') {
+      fetchLinks();
     }
   }, [activeTab, router]);
+
+  const fetchLinks = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.settings) {
+          setLinks({
+            webinar_link: data.settings.webinar_link || '',
+            whatsapp_link: data.settings.whatsapp_link || ''
+          });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateLinks = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(links)
+      });
+      if (res.ok) {
+        alert('Links updated successfully');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update links');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
+  };
 
   const fetchCourses = async () => {
     try {
@@ -293,6 +333,7 @@ export default function AdminDashboard() {
           <button className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('users')}>Users</button>
           <button className={`btn ${activeTab === 'courses' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('courses')}>Courses</button>
           <button className={`btn ${activeTab === 'videos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('videos')}>Videos</button>
+          <button className={`btn ${activeTab === 'links' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('links')}>Links</button>
         </div>
 
         {activeTab === 'users' && (
@@ -471,6 +512,43 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'links' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="card" style={{ padding: '2rem' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>Manage Platform Links</h3>
+              <form onSubmit={handleUpdateLinks} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '600px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontWeight: '600' }}>Webinar Registration Link</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://zoom.us/..." 
+                    value={links.webinar_link} 
+                    onChange={e => setLinks({...links, webinar_link: e.target.value})} 
+                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} 
+                  />
+                  <small style={{ color: 'var(--color-text)' }}>This link will be shown to users to join upcoming live sessions.</small>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontWeight: '600' }}>WhatsApp Community Link</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://chat.whatsapp.com/..." 
+                    value={links.whatsapp_link} 
+                    onChange={e => setLinks({...links, whatsapp_link: e.target.value})} 
+                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} 
+                  />
+                  <small style={{ color: 'var(--color-text)' }}>Users will be redirected here to join the community group.</small>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button type="submit" className="btn btn-primary">Save Links</button>
+                </div>
+              </form>
             </div>
           </div>
         )}

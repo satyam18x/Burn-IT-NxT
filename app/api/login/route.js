@@ -14,7 +14,8 @@ export async function POST(req) {
       return Response.json({ message: "Invalid credentials" }, { status: 401 });
     }
 
-    if (!user.is_active) {
+    // is_active check: only block if explicitly set to false (0)
+    if (user.is_active === 0 || user.is_active === false) {
       return Response.json({ message: "Account is deactivated. Contact admin." }, { status: 403 });
     }
 
