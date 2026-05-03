@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlayCircle, DownloadCloud, Activity, Users } from 'lucide-react';
+import VideoPlayer from '@/components/VideoPlayer';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -10,48 +11,51 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState([]);
   const [activeCourse, setActiveCourse] = useState(null);
   const [activeVideo, setActiveVideo] = useState(null);
+  const [youtubeId, setYoutubeId] = useState(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
-    if (!token || !userStr) {
+    if (!userStr) {
       router.push('/login');
       return;
     }
     const parsedUser = JSON.parse(userStr);
     setUser(parsedUser);
-    fetchMyCourses(token);
+    fetchMyCourses();
   }, [router]);
 
-  const fetchMyCourses = async (token) => {
+  const fetchMyCourses = async () => {
+    console.log("Fetching courses for user:", user);
     try {
-      const res = await fetch('/api/user/courses', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/user/courses');
+      console.log("Fetch courses response status:", res.status);
       if (res.ok) {
         const data = await res.json();
+        console.log("Received courses data:", data);
         setCourses(data);
         if (data.length > 0) {
-          fetchCourseDetails(data[0].id, token);
+          fetchCourseDetails(data[0].id);
         }
+      } else if (res.status === 401) {
+        router.push('/login');
       }
     } catch (err) {
-      console.error(err);
+      console.error("Fetch courses error:", err);
     }
   };
 
-  const fetchCourseDetails = async (courseId, token) => {
+
+  const fetchCourseDetails = async (courseId) => {
     try {
-      const res = await fetch(`/api/user/course/${courseId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`/api/user/course/${courseId}`);
       if (res.ok) {
         const data = await res.json();
         setActiveCourse(data);
         if (data.modules && data.modules.length > 0) {
           const firstMod = data.modules[0];
           if (firstMod.videos && firstMod.videos.length > 0) {
-            setActiveVideo(firstMod.videos[0]);
+            handleSelectVideo(firstMod.videos[0]);
           }
         }
       }
@@ -60,17 +64,29 @@ export default function DashboardPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
+  const handleSelectVideo = async (video) => {
+    setActiveVideo(video);
+    setLoadingVideo(true);
+    setYoutubeId(null);
+    try {
+      const res = await fetch(`/api/video/${video.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setYoutubeId(data.youtube_id);
+      } else {
+        console.error("Failed to fetch video access");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingVideo(false);
+    }
   };
 
-  const getEmbedUrl = (url) => {
-    if (!url) return null;
-    if (url.includes('youtube.com/watch?v=')) return url.replace('watch?v=', 'embed/');
-    if (url.includes('youtu.be/')) return url.replace('youtu.be/', 'youtube.com/embed/');
-    return url;
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    localStorage.removeItem('user');
+    router.push('/login');
   };
 
   if (!user) return null;
@@ -96,19 +112,11 @@ export default function DashboardPage() {
                   <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
                     <PlayCircle color="var(--color-primary)" /> {activeVideo ? activeVideo.title : 'Select a video'}
                   </h3>
-                  <div style={{ width: '100%', paddingTop: '56.25%', backgroundColor: 'var(--color-dark)', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
-                    {activeVideo?.video_url ? (
-                      <iframe 
-                        src={getEmbedUrl(activeVideo.video_url)} 
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                        allowFullScreen
-                      ></iframe>
-                    ) : (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                        <p>No video selected</p>
-                      </div>
-                    )}
-                  </div>
+                  <VideoPlayer 
+                    youtubeId={youtubeId} 
+                    userEmail={user.email} 
+                  />
+                  {loadingVideo && <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem', opacity: 0.7 }}>Loading secure stream...</p>}
                 </>
               ) : (
                 <div style={{ textAlign: 'center', padding: '3rem 0' }}>
@@ -124,7 +132,7 @@ export default function DashboardPage() {
                   {mod.videos?.map(video => (
                     <li 
                       key={video.id} 
-                      onClick={() => setActiveVideo(video)}
+                      onClick={() => handleSelectVideo(video)}
                       style={{ 
                         padding: '1rem', 
                         background: activeVideo?.id === video.id ? 'var(--color-accent)' : 'white', 
@@ -141,7 +149,30 @@ export default function DashboardPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card" style={{ padding: '1.5rem' }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}><DownloadCloud color="var(--color-primary)" size={20} /> My Courses</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {courses.map(c => (
+                  <button 
+                    key={c.id} 
+                    onClick={() => fetchCourseDetails(c.id)}
+                    style={{ 
+                      padding: '1rem', 
+                      textAlign: 'left', 
+                      background: activeCourse?.id === c.id ? 'var(--color-accent)' : 'white', 
+                      border: '1px solid rgba(0,0,0,0.1)', 
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: activeCourse?.id === c.id ? '700' : '400'
+                    }}
+                  >
+                    {c.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="card" style={{ padding: '1.5rem' }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}><Activity color="var(--color-primary)" size={20} /> Progress</h4>
+
               <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--color-accent)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '2rem', fontWeight: '800' }}>2.5kg</div>
                 <div>Lost so far</div>
@@ -157,3 +188,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
