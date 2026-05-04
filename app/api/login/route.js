@@ -41,6 +41,7 @@ export async function POST(req) {
 
     return Response.json({
       message: "Login successful",
+      token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {

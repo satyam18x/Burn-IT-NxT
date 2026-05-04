@@ -18,9 +18,24 @@ export default function CommunitySection({ settings = {} }) {
     webinar_link = null,
     webinar_image = null,
     webinar_title = 'Burn IT Out Masterclass',
-    webinar_date = 'Date & Time coming soon',
+    webinar_date = null,
+    webinar_time = null,
     whatsapp_link = null,
   } = settings;
+
+  const formatDisplayDate = () => {
+    if (!webinar_date) return 'Date & Time coming soon';
+    try {
+      const date = new Date(webinar_date);
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const dateStr = date.toLocaleDateString('en-US', options);
+      return webinar_time ? `${dateStr} @ ${webinar_time}` : dateStr;
+    } catch (e) {
+      return webinar_date;
+    }
+  };
+
+  const displayDate = formatDisplayDate();
 
   return (
     <>
@@ -239,7 +254,7 @@ export default function CommunitySection({ settings = {} }) {
                     <h3 className="cw-panel-title">{webinar_title}</h3>
                     <div className="cw-panel-meta">
                       <Calendar size={16} />
-                      {webinar_date}
+                      {displayDate}
                     </div>
                     
                     {webinar_link ? (

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PlayCircle, BookOpen, Activity, Users, ArrowRight, Loader2, CheckCircle2, ChevronDown, ChevronUp, LogOut, Layout, Menu, X } from 'lucide-react';
+import { PlayCircle, BookOpen, Activity, Users, ArrowRight, ArrowLeft, Loader2, CheckCircle2, ChevronDown, ChevronUp, LogOut, Layout, Menu, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import VideoPlayer from '@/components/VideoPlayer';
 
 export default function DashboardPage() {
@@ -153,6 +153,26 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const allVideos = activeCourse?.modules?.flatMap(mod => mod.videos || []) || [];
+  const currentIndex = allVideos.findIndex(v => v.id === activeVideo?.id);
+
+  const handleNextVideo = () => {
+    if (currentIndex < allVideos.length - 1) {
+      handleSelectVideo(allVideos[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevVideo = () => {
+    if (currentIndex > 0) {
+      handleSelectVideo(allVideos[currentIndex - 1]);
+    }
+  };
+
+  const handleVideoEnded = () => {
+    markAsWatched(activeVideo.id);
+    handleNextVideo();
+  };
+
   if (!user) return null;
 
   return (
@@ -167,8 +187,8 @@ export default function DashboardPage() {
               position: 'fixed',
               inset: 0,
               backgroundColor: 'rgba(0,0,0,0.5)',
-              zIndex: 90,
-              display: window.innerWidth < 768 ? 'block' : 'none'
+              zIndex: 1900,
+              display: typeof window !== 'undefined' && window.innerWidth < 1024 ? 'block' : 'none'
             }}
             className="mobile-overlay"
           />
@@ -189,18 +209,41 @@ export default function DashboardPage() {
           left: 0,
           bottom: 0,
           boxShadow: isSidebarOpen ? '4px 0 20px rgba(0,0,0,0.3)' : 'none',
-          zIndex: 100
+          zIndex: 2000
         }} className="sidebar">
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '1.25rem', color: 'white', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ 
+            height: '70px',
+            padding: '0 1.5rem', 
+            borderBottom: '1px solid rgba(255,255,255,0.1)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            position: 'relative'
+          }}>
+            <h2 style={{ fontSize: '1.1rem', color: 'white', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
               <span style={{ color: 'var(--color-primary)' }}>Burn</span> IT
             </h2>
-            <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }} className="mobile-only">
+            <button 
+              onClick={() => setIsSidebarOpen(false)} 
+              style={{ 
+                background: 'rgba(255,255,255,0.2)', 
+                border: 'none', 
+                color: 'white', 
+                cursor: 'pointer', 
+                padding: '8px', 
+                borderRadius: '8px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                zIndex: 110
+              }} 
+            >
               <X size={20} />
             </button>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1rem' }}>
             {/* Course Selector Dropdown (Simplified) */}
             <div style={{ marginBottom: '2rem' }}>
               <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>Active Program</label>
@@ -224,73 +267,38 @@ export default function DashboardPage() {
 
             <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', fontWeight: '700', marginBottom: '1rem', display: 'block' }}>Course Curriculum</label>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {activeCourse?.modules?.map((mod) => (
-                <div key={mod.id} style={{ marginBottom: '0.5rem' }}>
-                  <button 
-                    onClick={() => toggleModule(mod.id)}
-                    style={{ 
-                      width: '100%', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between', 
-                      padding: '0.75rem', 
-                      backgroundColor: 'rgba(255,255,255,0.02)', 
-                      border: 'none', 
-                      color: 'white', 
-                      cursor: 'pointer',
-                      borderRadius: '8px',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{mod.title}</span>
-                    {expandedModules[mod.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                  
-                  {expandedModules[mod.id] !== false && (
-                    <ul style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      {mod.videos?.map(video => (
-                        <li
-                          key={video.id}
-                          onClick={() => handleSelectVideo(video)}
-                          style={{
-                            padding: '0.75rem 1rem 0.75rem 1.5rem',
-                            fontSize: '0.85rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            backgroundColor: activeVideo?.id === video.id ? 'var(--color-primary)' : 'transparent',
-                            color: activeVideo?.id === video.id ? 'white' : 'rgba(255,255,255,0.7)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
-                          onMouseLeave={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          {watchedVideos.includes(video.id) ? 
-                            <CheckCircle2 size={16} color={activeVideo?.id === video.id ? 'white' : '#4ade80'} /> : 
-                            <PlayCircle size={16} opacity={0.5} />
-                          }
-                          <span style={{ flex: 1 }}>{video.title}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {activeCourse?.modules?.flatMap(mod => mod.videos || []).map((video) => (
+                <div
+                  key={video.id}
+                  onClick={() => handleSelectVideo(video)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.85rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: activeVideo?.id === video.id ? 'var(--color-primary)' : 'transparent',
+                    color: activeVideo?.id === video.id ? 'white' : 'rgba(255,255,255,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    transition: 'all 0.2s ease',
+                    marginBottom: '2px'
+                  }}
+                  onMouseEnter={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+                  onMouseLeave={(e) => { if (activeVideo?.id !== video.id) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {watchedVideos.includes(video.id) ? 
+                    <CheckCircle2 size={16} color={activeVideo?.id === video.id ? 'white' : '#4ade80'} /> : 
+                    <PlayCircle size={16} opacity={0.5} />
+                  }
+                  <span style={{ flex: 1, fontWeight: '500' }}>{video.title}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.5rem', color: 'rgba(255,255,255,0.5)' }}>
-              <span>Your Progress</span>
-              <span>{progressStats.percentage}%</span>
-            </div>
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ width: `${progressStats.percentage}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 0.5s ease' }}></div>
-            </div>
-          </div>
+
         </aside>
       </div>
 
@@ -319,7 +327,7 @@ export default function DashboardPage() {
         }} className="top-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}>
-              {isSidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 768 ? <X size={24} /> : <Menu size={24} />}
+              {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             <h1 style={{ fontSize: '1rem', fontWeight: '700', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
               {activeCourse ? activeCourse.title : 'Dashboard'}
@@ -331,24 +339,6 @@ export default function DashboardPage() {
               <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e293b' }}>{user.name}</span>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Student</span>
             </div>
-            <button 
-              onClick={handleLogout}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem', 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid #e2e8f0', 
-                backgroundColor: 'white', 
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                color: '#ef4444'
-              }}
-            >
-              <LogOut size={16} /> Logout
-            </button>
           </div>
         </header>
 
@@ -358,8 +348,57 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               {/* Video Player Card */}
               <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      onClick={handlePrevVideo} 
+                      disabled={currentIndex <= 0}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px', 
+                        padding: '6px 12px', 
+                        borderRadius: '6px', 
+                        border: '1px solid #e2e8f0', 
+                        background: currentIndex <= 0 ? '#f8fafc' : 'white',
+                        cursor: currentIndex <= 0 ? 'not-allowed' : 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: currentIndex <= 0 ? '#cbd5e1' : '#475569'
+                      }}
+                    >
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <button 
+                      onClick={handleNextVideo} 
+                      disabled={currentIndex >= allVideos.length - 1}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px', 
+                        padding: '6px 12px', 
+                        borderRadius: '6px', 
+                        border: '1px solid #e2e8f0', 
+                        background: currentIndex >= allVideos.length - 1 ? '#f8fafc' : 'white',
+                        cursor: currentIndex >= allVideos.length - 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: currentIndex >= allVideos.length - 1 ? '#cbd5e1' : '#475569'
+                      }}
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>
+                    Lesson {currentIndex + 1} of {allVideos.length}
+                  </div>
+                </div>
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', backgroundColor: 'black' }}>
-                  <VideoPlayer youtubeId={youtubeId} userEmail={user.email} />
+                  <VideoPlayer 
+                    youtubeId={youtubeId} 
+                    userEmail={user.email} 
+                    onEnded={handleVideoEnded}
+                  />
                   {loadingVideo && (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10 }}>
                       <Loader2 size={40} color="white" style={{ animation: 'spin 1s linear infinite' }} />
@@ -372,7 +411,7 @@ export default function DashboardPage() {
                     <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', marginBottom: '0.25rem' }}>
                       {activeVideo ? activeVideo.title : 'Select a lesson'}
                     </h2>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Module: {activeCourse.modules.find(m => m.videos.find(v => v.id === activeVideo?.id))?.title || 'General'}</p>
+
                   </div>
                   
                   <button 
@@ -410,11 +449,19 @@ export default function DashboardPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
                 <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
                   <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#1e293b' }}>
-                    <Activity color="var(--color-primary)" size={20} /> Today's Goal
+                    <Activity color="var(--color-primary)" size={20} /> Overall Course Progress
                   </h4>
-                  <div style={{ padding: '1rem', backgroundColor: 'rgba(255,106,0,0.05)', borderRadius: '12px', border: '1px solid rgba(255,106,0,0.1)' }}>
-                    <p style={{ fontSize: '0.95rem', fontWeight: '600', color: '#1e293b' }}>Complete "Day 1 – Full Body Burn"</p>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>Estimated time: 45 minutes</p>
+                  <div style={{ padding: '1.25rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: '700' }}>Completion Status</span>
+                      <span style={{ fontSize: '1.1rem', color: 'var(--color-primary)', fontWeight: '800' }}>{progressStats.percentage}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '10px', backgroundColor: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                      <div style={{ width: `${progressStats.percentage}%`, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: '10px', transition: 'width 0.5s ease' }}></div>
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '1rem', fontWeight: '500' }}>
+                      You've completed {progressStats.watched} out of {progressStats.total} videos. Keep it up!
+                    </p>
                   </div>
                 </div>
 

@@ -25,22 +25,16 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { webinar_link, whatsapp_link } = await request.json();
+    const body = await request.json();
 
-    // Update webinar_link
-    if (webinar_link !== undefined) {
-      await db.query(
-        'INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
-        ['webinar_link', webinar_link, webinar_link]
-      );
-    }
-
-    // Update whatsapp_link
-    if (whatsapp_link !== undefined) {
-      await db.query(
-        'INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
-        ['whatsapp_link', whatsapp_link, whatsapp_link]
-      );
+    // Dynamically update any settings provided in the body
+    for (const [key, value] of Object.entries(body)) {
+      if (value !== undefined) {
+        await db.query(
+          'INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
+          [key, value, value]
+        );
+      }
     }
 
     return NextResponse.json({ success: true });

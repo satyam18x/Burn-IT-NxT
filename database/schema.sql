@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS `courses` (
   `id`          INT(11)      NOT NULL AUTO_INCREMENT,
   `title`       VARCHAR(255) NOT NULL,
   `description` TEXT,
+  `duration`    VARCHAR(255),
+  `includes`    TEXT,
+  `image`       VARCHAR(255),
+  `recommended` TINYINT(1)   DEFAULT 0,
   `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

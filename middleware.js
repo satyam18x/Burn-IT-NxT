@@ -40,6 +40,15 @@ export function middleware(request) {
 
   // Redirect logged-in users away from login page
   if (pathname === '/login' && token) {
+    try {
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(atob(payloadBase64));
+      if (payload.role === 'admin') {
+        return NextResponse.redirect(new URL('/admin', request.url));
+      }
+    } catch (e) {
+      // If parsing fails, just go to dashboard as fallback
+    }
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

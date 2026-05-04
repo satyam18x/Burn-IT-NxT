@@ -16,7 +16,7 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function VideoPlayer({ youtubeId, userEmail }) {
+export default function VideoPlayer({ youtubeId, userEmail, onEnded }) {
   const playerRef = useRef(null);
   const iframeContainerRef = useRef(null); // stable React-managed wrapper div
   const mountElRef = useRef(null);          // manually created div — YT can replace it freely
@@ -80,7 +80,7 @@ export default function VideoPlayer({ youtubeId, userEmail }) {
     mountElRef.current = mountEl;
 
     const loadPlayer = () => {
-      if (!iframeContainerRef.current) return;
+      if (!iframeContainerRef.current || playerRef.current) return;
       iframeContainerRef.current.appendChild(mountEl);
 
       playerRef.current = new window.YT.Player(mountEl, {
@@ -95,7 +95,7 @@ export default function VideoPlayer({ youtubeId, userEmail }) {
           showinfo: 0,
           playsinline: 1,
           enablejsapi: 1,
-          origin: window.location.origin,
+          origin: window.location.protocol + '//' + window.location.host,
         },
         events: {
           onReady: (e) => {
@@ -104,17 +104,23 @@ export default function VideoPlayer({ youtubeId, userEmail }) {
             setIsReady(true);
           },
           onStateChange: (e) => {
-            const YT = window.YT.PlayerState;
-            if (e.data === YT.PLAYING) {
+            const YTState = window.YT.PlayerState;
+            if (e.data === YTState.PLAYING) {
               setIsPlaying(true);
               setIsBuffering(false);
               setDuration(playerRef.current.getDuration());
-            } else if (e.data === YT.PAUSED || e.data === YT.ENDED) {
+            } else if (e.data === YTState.PAUSED) {
               setIsPlaying(false);
-            } else if (e.data === YT.BUFFERING) {
+            } else if (e.data === YTState.ENDED) {
+              setIsPlaying(false);
+              if (onEnded) onEnded();
+            } else if (e.data === YTState.BUFFERING) {
               setIsBuffering(true);
             }
           },
+          onError: (e) => {
+            console.error('YouTube Player Error:', e.data);
+          }
         },
       });
     };
@@ -122,10 +128,18 @@ export default function VideoPlayer({ youtubeId, userEmail }) {
     if (window.YT && window.YT.Player) {
       loadPlayer();
     } else {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-      window.onYouTubeIframeAPIReady = loadPlayer;
+      if (!document.getElementById('youtube-iframe-api')) {
+        const tag = document.createElement('script');
+        tag.id = 'youtube-iframe-api';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+      
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (previousCallback) previousCallback();
+        loadPlayer();
+      };
     }
 
     return () => {

@@ -2,6 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  Users,
+  BookOpen,
+  Video,
+  Link as LinkIcon,
+  PlusCircle,
+  UserPlus,
+  Layout,
+  Trash2,
+  Edit3,
+  ExternalLink,
+  ShieldCheck,
+  Activity,
+  LogOut,
+  Download,
+  CalendarCheck,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Calendar,
+  MessageSquare,
+  User as UserIcon
+} from 'lucide-react';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -10,18 +34,19 @@ export default function AdminDashboard() {
   const [courses, setCourses] = useState([]);
   const [modules, setModules] = useState([]);
   const [videos, setVideos] = useState([]);
-  const [links, setLinks] = useState({ webinar_link: '', whatsapp_link: '' });
-  
+  const [links, setLinks] = useState({ webinar_link: '', whatsapp_link: '', webinar_date: '', webinar_time: '' });
+
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'user' });
   const [newCourse, setNewCourse] = useState({ title: '', description: '', duration: '', includes: '', image: '', recommended: false });
   const [newVideo, setNewVideo] = useState({ title: '', youtube_id: '', course_id: '', order_index: 0 });
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [editingVideoId, setEditingVideoId] = useState(null);
-  
+
   const [assignData, setAssignData] = useState({ userId: '', courseId: '' });
   const [assignments, setAssignments] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -29,7 +54,7 @@ export default function AdminDashboard() {
       router.push('/login');
       return;
     }
-    
+
     const user = JSON.parse(userStr);
     if (user.role !== 'admin') {
       router.push('/login');
@@ -41,12 +66,14 @@ export default function AdminDashboard() {
     } else if (activeTab === 'courses') {
       fetchCourses();
       fetchAssignments();
-      fetchUsers(); // needed to populate the Assign Course user dropdown
+      fetchUsers();
     } else if (activeTab === 'videos') {
       fetchVideos();
       fetchCourses();
     } else if (activeTab === 'links') {
       fetchLinks();
+    } else if (activeTab === 'webinar') {
+      fetchRegistrations();
     }
   }, [activeTab, router]);
 
@@ -58,7 +85,9 @@ export default function AdminDashboard() {
         if (data.success && data.settings) {
           setLinks({
             webinar_link: data.settings.webinar_link || '',
-            whatsapp_link: data.settings.whatsapp_link || ''
+            whatsapp_link: data.settings.whatsapp_link || '',
+            webinar_date: data.settings.webinar_date || '',
+            webinar_time: data.settings.webinar_time || ''
           });
         }
       }
@@ -128,11 +157,31 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
+        const adminUser = data.find(u => u.role === 'admin');
+        if (adminUser) {
+          setAssignData(prev => ({
+            ...prev,
+            userId: prev.userId || adminUser.id
+          }));
+        }
       }
     } catch (err) {
       console.error(err);
     }
   };
+
+  const fetchRegistrations = async () => {
+    try {
+      const res = await fetch('/api/admin/webinar-registrations');
+      if (res.ok) {
+        const data = await res.json();
+        setRegistrations(data);
+      }
+    } catch (err) {
+      console.error('Error fetching registrations:', err);
+    }
+  };
+
 
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -160,7 +209,6 @@ export default function AdminDashboard() {
     try {
       const url = isEditing ? `/api/admin/courses/${editingCourseId}` : '/api/admin/courses';
       const method = isEditing ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
@@ -184,13 +232,11 @@ export default function AdminDashboard() {
     try {
       const url = editingVideoId ? `/api/admin/videos/${editingVideoId}` : '/api/admin/videos';
       const method = editingVideoId ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newVideo, module_id: null }) // Default to null/no module
+        body: JSON.stringify({ ...newVideo, module_id: null })
       });
-
       if (res.ok) {
         alert(editingVideoId ? 'Video updated successfully' : 'Video added successfully');
         setNewVideo({ title: '', youtube_id: '', course_id: '', order_index: 0 });
@@ -200,19 +246,13 @@ export default function AdminDashboard() {
         const data = await res.json();
         alert(data.error || data.message || 'Error processing video');
       }
-
     } catch (err) {
       alert('Network error');
     }
   };
 
   const handleEditVideo = (v) => {
-    setNewVideo({
-      title: v.title,
-      youtube_id: v.youtube_id,
-      course_id: v.course_id,
-      order_index: v.order_index
-    });
+    setNewVideo({ title: v.title, youtube_id: v.youtube_id, course_id: v.course_id, order_index: v.order_index });
     setEditingVideoId(v.id);
   };
 
@@ -270,12 +310,8 @@ export default function AdminDashboard() {
   const handleRemoveAssignment = async (userId, courseId) => {
     if (!window.confirm('Remove assignment?')) return;
     try {
-      const res = await fetch(`/api/admin/assignments/${userId}/${courseId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchAssignments();
-      }
+      const res = await fetch(`/api/admin/assignments/${userId}/${courseId}`, { method: 'DELETE' });
+      if (res.ok) fetchAssignments();
     } catch (err) {
       alert('Network error');
     }
@@ -284,12 +320,8 @@ export default function AdminDashboard() {
   const handleDeleteCourse = async (courseId) => {
     if (!window.confirm('Delete course?')) return;
     try {
-      const res = await fetch(`/api/admin/courses/${courseId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchCourses();
-      }
+      const res = await fetch(`/api/admin/courses/${courseId}`, { method: 'DELETE' });
+      if (res.ok) fetchCourses();
     } catch (err) {
       alert('Network error');
     }
@@ -302,61 +334,194 @@ export default function AdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isActive: !currentStatus })
       });
-      if (res.ok) {
-        fetchUsers();
-      }
+      if (res.ok) fetchUsers();
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' }); 
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout API failed:', err);
+    }
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
     router.push('/login');
   };
 
   return (
-    <div style={{ backgroundColor: 'var(--color-light)', minHeight: '100vh' }}>
-      <div style={{ backgroundColor: 'var(--color-dark)', color: 'white', padding: '1rem 0' }}>
-        <div className="container dashboard-header-flex" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: '1.5rem', color: 'white' }}>Admin Dashboard</h2>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Admin Mode</span>
-            <button className="btn" style={{ background: 'transparent', border: 'none', color: 'white' }} onClick={handleLogout}>Logout</button>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '4rem' }}>
+      <style>{`
+        .admin-card {
+          background: white;
+          border-radius: 16px;
+          border: 1px solid #e2e8f0;
+          padding: 2rem;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          transition: all 0.3s ease;
+        }
+        .admin-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
+        .admin-input {
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          border: 2px solid #e2e8f0;
+          background: #fcfcfc;
+          font-size: 0.95rem;
+          transition: all 0.2s ease;
+          width: 100%;
+          color: #1e293b;
+        }
+        .admin-input:focus {
+          outline: none;
+          border-color: #ff5e00;
+          background: white;
+          box-shadow: 0 0 0 4px rgba(255, 94, 0, 0.1);
+        }
+        .admin-tab-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          border-radius: 10px;
+          font-weight: 600;
+          font-size: 0.9rem;
+          transition: all 0.2s ease;
+          flex-grow: 1;
+        }
+        .admin-btn-primary {
+          background: #0f172a;
+          color: white;
+          border: none;
+          padding: 0.75rem 1.5rem;
+          border-radius: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .admin-btn-primary:hover {
+          background: #1e293b;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+        }
+        .admin-btn-outline {
+          background: white;
+          border: 1px solid #e2e8f0;
+          color: #475569;
+          padding: 0.6rem 1.2rem;
+          border-radius: 8px;
+          font-weight: 600;
+          transition: all 0.2s ease;
+        }
+        .admin-btn-outline:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+          color: #1e293b;
+        }
+        @media (max-width: 868px) {
+          .admin-tabs-container {
+            flex-direction: column !important;
+            gap: 4px !important;
+          }
+          .admin-tab-btn {
+            width: 100%;
+            justify-content: flex-start;
+          }
+          .admin-grid-responsive {
+            grid-template-columns: 1fr !important;
+          }
+          .admin-header-content {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1.5rem;
+          }
+          .container {
+            padding: 0 1rem;
+          }
+          .webinar-mobile-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem !important;
+          }
+          .webinar-download-btn {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+          .webinar-table td, .webinar-table th {
+            padding: 0.6rem 0.5rem !important;
+            font-size: 0.75rem !important;
+          }
+          .webinar-table th {
+            font-size: 0.7rem !important;
+            white-space: nowrap;
+          }
+          .webinar-row {
+            background: white !important;
+          }
+        }
+        .webinar-row:hover {
+          background-color: #f8fafc;
+          cursor: pointer;
+        }
+      `}</style>
+
+      <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '1.5rem 0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+        <div className="container admin-header-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ background: 'var(--color-primary)', padding: '10px', borderRadius: '12px' }}>
+              <ShieldCheck size={28} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.6rem', color: 'white', textTransform: 'none', letterSpacing: '-0.02em', margin: 0, fontWeight: '800' }}>Admin Console</h2>
+              <p style={{ fontSize: '0.85rem', opacity: 0.6, margin: '2px 0 0' }}>Burn IT Out Fitness Management</p>
+            </div>
           </div>
+          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
+            <LogOut size={18} /> Logout
+          </button>
         </div>
       </div>
 
       <div className="container section-padding">
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-          <button className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('users')}>Users</button>
-          <button className={`btn ${activeTab === 'courses' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('courses')}>Courses</button>
-          <button className={`btn ${activeTab === 'videos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('videos')}>Videos</button>
-          <button className={`btn ${activeTab === 'links' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('links')}>Links</button>
+        <div className="admin-tabs-container" style={{ display: 'flex', gap: '0.75rem', marginBottom: '2.5rem', background: 'white', padding: '10px', borderRadius: '16px', boxShadow: '0 4px 20px -5px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+          <button className="admin-tab-btn" style={{ background: activeTab === 'users' ? '#0f172a' : 'transparent', color: activeTab === 'users' ? 'white' : '#64748b', border: 'none' }} onClick={() => setActiveTab('users')}>
+            <Users size={18} /> Users
+          </button>
+          <button className="admin-tab-btn" style={{ background: activeTab === 'courses' ? '#0f172a' : 'transparent', color: activeTab === 'courses' ? 'white' : '#64748b', border: 'none' }} onClick={() => setActiveTab('courses')}>
+            <BookOpen size={18} /> Courses
+          </button>
+          <button className="admin-tab-btn" style={{ background: activeTab === 'videos' ? '#0f172a' : 'transparent', color: activeTab === 'videos' ? 'white' : '#64748b', border: 'none' }} onClick={() => setActiveTab('videos')}>
+            <Video size={18} /> Videos
+          </button>
+          <button className="admin-tab-btn" style={{ background: activeTab === 'links' ? '#0f172a' : 'transparent', color: activeTab === 'links' ? 'white' : '#64748b', border: 'none' }} onClick={() => setActiveTab('links')}>
+            <Layout size={18} /> Settings
+          </button>
+          <button className="admin-tab-btn" style={{ background: activeTab === 'webinar' ? '#0f172a' : 'transparent', color: activeTab === 'webinar' ? 'white' : '#64748b', border: 'none' }} onClick={() => setActiveTab('webinar')}>
+            <CalendarCheck size={18} /> Webinars
+          </button>
         </div>
 
         {activeTab === 'users' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '2rem' }}>
+            <div className="admin-card">
               <h3 style={{ marginBottom: '1.5rem' }}>Add New User</h3>
               <form onSubmit={handleAddUser} style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <input type="text" required placeholder="Name" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="email" required placeholder="Email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="password" required placeholder="Password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }}>
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <button type="submit" className="btn btn-primary">Add User</button>
+                <input type="text" placeholder="Name" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} className="admin-input" required />
+                <input type="email" placeholder="Email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} className="admin-input" required />
+                <input type="password" placeholder="Password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} className="admin-input" required />
+                <button type="submit" className="admin-btn-primary">Create User</button>
               </form>
             </div>
-            <div className="card" style={{ padding: '2rem' }}>
+            <div className="admin-card">
               <h3 style={{ marginBottom: '1.5rem' }}>User List</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid var(--color-primary)' }}>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <th style={{ padding: '1rem' }}>Name</th>
                       <th style={{ padding: '1rem' }}>Email</th>
                       <th style={{ padding: '1rem' }}>Role</th>
@@ -366,12 +531,14 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {users.map(u => (
-                      <tr key={u.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                      <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '1rem' }}>{u.name}</td>
                         <td style={{ padding: '1rem' }}>{u.email}</td>
                         <td style={{ padding: '1rem' }}>{u.role}</td>
                         <td style={{ padding: '1rem' }}>{u.is_active ? 'Active' : 'Inactive'}</td>
-                        <td style={{ padding: '1rem' }}><button onClick={() => toggleUserStatus(u.id, u.is_active)} className="btn btn-outline" style={{ fontSize: '0.8rem' }}>Toggle</button></td>
+                        <td style={{ padding: '1rem' }}>
+                          {u.role !== 'admin' && <button onClick={() => toggleUserStatus(u.id, u.is_active)} className="admin-btn-outline">Toggle</button>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -383,172 +550,108 @@ export default function AdminDashboard() {
 
         {activeTab === 'courses' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>{isEditing ? 'Edit Course' : 'Create Course'}</h3>
+            <div className="admin-card">
+              <h3>{isEditing ? 'Edit Course' : 'Add Course'}</h3>
               <form onSubmit={handleAddCourse} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <input type="text" required placeholder="Course Title" value={newCourse.title} onChange={e => setNewCourse({...newCourse, title: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="text" placeholder="Duration" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="text" placeholder="Image URL" value={newCourse.image} onChange={e => setNewCourse({...newCourse, image: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="text" placeholder="Includes (comma separated)" value={newCourse.includes} onChange={e => setNewCourse({...newCourse, includes: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <textarea placeholder="Description" value={newCourse.description} onChange={e => setNewCourse({...newCourse, description: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', minHeight: '100px' }} />
+                <input type="text" placeholder="Title" value={newCourse.title} onChange={e => setNewCourse({ ...newCourse, title: e.target.value })} className="admin-input" required />
+                <textarea placeholder="Description" value={newCourse.description} onChange={e => setNewCourse({ ...newCourse, description: e.target.value })} className="admin-input" />
+                <input type="text" placeholder="Duration" value={newCourse.duration} onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })} className="admin-input" />
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button type="submit" className="btn btn-primary">{isEditing ? 'Update' : 'Create'}</button>
-                  {isEditing && <button type="button" onClick={handleCancelEdit} className="btn btn-outline">Cancel</button>}
+                  <button type="submit" className="admin-btn-primary">{isEditing ? 'Update' : 'Add'}</button>
+                  {isEditing && <button type="button" onClick={handleCancelEdit} className="admin-btn-outline">Cancel</button>}
                 </div>
               </form>
             </div>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Course List</h3>
+            <div className="admin-card">
               {courses.map(c => (
-                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                <div key={c.id} style={{ padding: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
                   <span>{c.title}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => handleEditCourse(c)} className="btn btn-outline" style={{ fontSize: '0.8rem' }}>Edit</button>
-                    <button onClick={() => handleDeleteCourse(c.id)} className="btn btn-outline" style={{ fontSize: '0.8rem', color: 'red' }}>Delete</button>
+                  <div>
+                    <button onClick={() => handleEditCourse(c)} className="admin-btn-outline">Edit</button>
+                    <button onClick={() => handleDeleteCourse(c.id)} className="admin-btn-outline">Delete</button>
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Assign Course</h3>
-              <form onSubmit={handleAssignCourse} style={{ display: 'flex', gap: '1rem' }}>
-                <select required value={assignData.userId} onChange={e => setAssignData({...assignData, userId: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', flexGrow: 1 }}>
-                  <option value="">Select User</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                </select>
-                <select required value={assignData.courseId} onChange={e => setAssignData({...assignData, courseId: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', flexGrow: 1 }}>
-                  <option value="">Select Course</option>
-                  {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                </select>
-                <button type="submit" className="btn btn-primary">Assign</button>
-              </form>
-            </div>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Current Assignments</h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--color-primary)' }}>
-                      <th style={{ padding: '1rem' }}>User</th>
-                      <th style={{ padding: '1rem' }}>Course</th>
-                      <th style={{ padding: '1rem' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assignments.map((a, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                        <td style={{ padding: '1rem' }}>
-                          <div>{a.userName}</div>
-                          <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{a.userEmail}</div>
-                        </td>
-                        <td style={{ padding: '1rem' }}>{a.courseTitle}</td>
-                        <td style={{ padding: '1rem' }}>
-                          <button 
-                            onClick={() => handleRemoveAssignment(a.userId, a.courseId)} 
-                            className="btn btn-outline" 
-                            style={{ fontSize: '0.8rem', color: 'red' }}
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {assignments.length === 0 && (
-                      <tr>
-                        <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>No assignments found</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'videos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>{editingVideoId ? 'Edit Video' : 'Add Video'}</h3>
-              <form onSubmit={handleAddVideo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <input type="text" required placeholder="Video Title" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <input type="text" required placeholder="YouTube ID (e.g. dQw4w9WgXcQ)" value={newVideo.youtube_id} onChange={e => setNewVideo({...newVideo, youtube_id: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr' }}>
-                  <select required value={newVideo.course_id} onChange={e => setNewVideo({...newVideo, course_id: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px' }}>
-                    <option value="">Select Course</option>
-                    {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                  </select>
-                </div>
-                <input type="number" placeholder="Order Index" value={newVideo.order_index} onChange={e => setNewVideo({...newVideo, order_index: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} />
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button type="submit" className="btn btn-primary">{editingVideoId ? 'Update' : 'Add'}</button>
-                  {editingVideoId && <button type="button" onClick={() => { setEditingVideoId(null); setNewVideo({ title: '', youtube_id: '', course_id: '', order_index: 0 }); }} className="btn btn-outline">Cancel</button>}
-                </div>
+            <div className="admin-card">
+              <h3>Add Video</h3>
+              <form onSubmit={handleAddVideo} style={{ display: 'grid', gap: '1rem' }}>
+                <input type="text" placeholder="Title" value={newVideo.title} onChange={e => setNewVideo({ ...newVideo, title: e.target.value })} className="admin-input" required />
+                <input type="text" placeholder="YouTube ID" value={newVideo.youtube_id} onChange={e => setNewVideo({ ...newVideo, youtube_id: e.target.value })} className="admin-input" required />
+                <select value={newVideo.course_id} onChange={e => setNewVideo({ ...newVideo, course_id: e.target.value })} className="admin-input" required>
+                  <option value="">Select Course</option>
+                  {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                </select>
+                <button type="submit" className="admin-btn-primary">Upload</button>
               </form>
             </div>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Video List</h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          </div>
+        )}
+
+        {activeTab === 'links' && (
+          <div className="admin-card">
+            <h3>Site Settings</h3>
+            <form onSubmit={handleUpdateLinks} style={{ display: 'grid', gap: '1rem' }}>
+              <input type="url" placeholder="Webinar URL" value={links.webinar_link} onChange={e => setLinks({ ...links, webinar_link: e.target.value })} className="admin-input" />
+              <input type="date" value={links.webinar_date} onChange={e => setLinks({ ...links, webinar_date: e.target.value })} className="admin-input" />
+              <input type="text" placeholder="Webinar Time" value={links.webinar_time} onChange={e => setLinks({ ...links, webinar_time: e.target.value })} className="admin-input" />
+              <input type="url" placeholder="WhatsApp Link" value={links.whatsapp_link} onChange={e => setLinks({ ...links, whatsapp_link: e.target.value })} className="admin-input" />
+              <button type="submit" className="admin-btn-primary">Update Settings</button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === 'webinar' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="webinar-mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.8rem', color: '#1e293b', margin: 0 }}>Webinar Registrations</h2>
+            </div>
+
+            <div className="admin-card" style={{ padding: '0', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+              <div style={{ overflowX: 'auto', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <table className="webinar-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid var(--color-primary)' }}>
-                      <th style={{ padding: '1rem' }}>Title</th>
-                      <th style={{ padding: '1rem' }}>Course</th>
-                      <th style={{ padding: '1rem' }}>YouTube ID</th>
-                      <th style={{ padding: '1rem' }}>Actions</th>
+                    <tr style={{ background: '#0f172a', color: 'white' }}>
+                      <th style={{ padding: '1rem' }}>DATE</th>
+                      <th style={{ padding: '1rem' }}>NAME</th>
+                      <th style={{ padding: '1rem' }}>CONTACT INFO</th>
+                      <th style={{ padding: '1rem' }}>DEMOGRAPHICS</th>
+                      <th style={{ padding: '1rem' }}>MESSAGE</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {videos.map(v => (
-                      <tr key={v.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                        <td style={{ padding: '1rem' }}>{v.title}</td>
-                        <td style={{ padding: '1rem' }}>{courses.find(c => c.id == v.course_id)?.title || v.course_id}</td>
-                        <td style={{ padding: '1rem' }}><code>{v.youtube_id}</code></td>
-                        <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEditVideo(v)} className="btn btn-outline" style={{ fontSize: '0.8rem' }}>Edit</button>
-                          <button onClick={() => handleDeleteVideo(v.id)} className="btn btn-outline" style={{ fontSize: '0.8rem', color: 'red' }}>Delete</button>
+                    {registrations.map(r => (
+                      <tr key={r.id} className="webinar-row" style={{ borderBottom: '1px solid #e2e8f0', background: 'white' }}>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ fontWeight: '700', color: '#475569' }}>{new Date(r.created_at).toLocaleDateString()}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ fontWeight: '700', color: '#1e293b' }}>{r.name}</div>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ fontWeight: '600', color: '#1e293b' }}>{r.email}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{r.phone || 'N/A'}</div>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ fontWeight: '600', color: '#1e293b' }}>{r.age || 'N/A'} yrs</div>
+                          <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{r.region || 'N/A'}</div>
+                        </td>
+                        <td style={{ padding: '1rem', maxWidth: '250px' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                            {r.message || '-'}
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'links' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card" style={{ padding: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Manage Platform Links</h3>
-              <form onSubmit={handleUpdateLinks} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '600px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontWeight: '600' }}>Webinar Registration Link</label>
-                  <input 
-                    type="url" 
-                    placeholder="https://zoom.us/..." 
-                    value={links.webinar_link} 
-                    onChange={e => setLinks({...links, webinar_link: e.target.value})} 
-                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} 
-                  />
-                  <small style={{ color: 'var(--color-text)' }}>This link will be shown to users to join upcoming live sessions.</small>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontWeight: '600' }}>WhatsApp Community Link</label>
-                  <input 
-                    type="url" 
-                    placeholder="https://chat.whatsapp.com/..." 
-                    value={links.whatsapp_link} 
-                    onChange={e => setLinks({...links, whatsapp_link: e.target.value})} 
-                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)' }} 
-                  />
-                  <small style={{ color: 'var(--color-text)' }}>Users will be redirected here to join the community group.</small>
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary">Save Links</button>
-                </div>
-              </form>
             </div>
           </div>
         )}
@@ -556,5 +659,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
