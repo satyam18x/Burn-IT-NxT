@@ -68,15 +68,6 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
----
-
-## 🔑 Default Login
-
-| Role  | Email                | Password  |
-|-------|----------------------|-----------|
-| Admin | admin@burnit.com     | admin123  |
-
-> ⚠️ **Change the admin password after first login!**
 
 ---
 

@@ -3,7 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, ShieldCheck } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
+import dynamic from 'next/dynamic';
+
+const GoogleLogin = dynamic(
+  () => import('@react-oauth/google').then((mod) => mod.GoogleLogin),
+  { ssr: false }
+);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -128,20 +133,24 @@ export default function LoginPage() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setLoginError('Google Login Failed')}
-              theme="filled_blue"
-              shape="pill"
-            />
-          </div>
+          {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setLoginError('Google Login Failed')}
+                  theme="filled_blue"
+                  shape="pill"
+                />
+              </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.5rem 0' }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
-            <span style={{ fontSize: '0.8rem', color: '#A0AEC0', fontWeight: '600' }}>OR</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
-          </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.5rem 0' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+                <span style={{ fontSize: '0.8rem', color: '#A0AEC0', fontWeight: '600' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>

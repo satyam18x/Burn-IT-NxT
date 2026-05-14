@@ -10,6 +10,10 @@ export async function GET() {
   }
 
   try {
+    if (user.role === 'admin') {
+      const [allCourses] = await db.query("SELECT * FROM courses");
+      return Response.json(allCourses);
+    }
     const [rows] = await db.query(
       "SELECT c.* FROM courses c JOIN user_courses uc ON c.id = uc.course_id WHERE uc.user_id = ?",
       [user.id]

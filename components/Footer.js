@@ -1,8 +1,25 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { MessageCircle } from 'lucide-react';
 
 const Footer = () => {
+  const pathname = usePathname();
+  const [user, setUser] = React.useState(null);
+
+  React.useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error("Failed to parse user session in footer", e);
+      }
+    }
+  }, [pathname]);
+
   return (
     <footer>
       <div className="container">
@@ -17,7 +34,7 @@ const Footer = () => {
             </p>
             <div className="footer-socials">
               <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg></a>
-              <a href="https://wa.me/something" target="_blank" rel="noopener noreferrer"><MessageCircle size={20} /></a>
+              <a href={user ? (user.role === 'admin' ? "https://wa.me/admin_number" : "https://wa.me/support_number") : "https://wa.me/default_number"} target="_blank" rel="noopener noreferrer"><MessageCircle size={20} /></a>
             </div>
           </div>
           
@@ -27,7 +44,6 @@ const Footer = () => {
               <li><Link href="/about">About Us</Link></li>
               <li><Link href="/programs">Our Programs</Link></li>
               <li><Link href="/success-stories">Success Stories</Link></li>
-              <li><Link href="/blog">Blog & Tips</Link></li>
               <li><Link href="/contact">Contact Us</Link></li>
             </ul>
           </div>
@@ -46,7 +62,13 @@ const Footer = () => {
             <h4>Support</h4>
             <ul>
               <li><Link href="/contact">FAQ</Link></li>
-              <li><Link href="/login">Member Login</Link></li>
+              <li>
+                {user ? (
+                  <Link href={user.role === 'admin' ? '/admin' : '/dashboard'}>My Dashboard</Link>
+                ) : (
+                  <Link href="/login">Member Login</Link>
+                )}
+              </li>
               <li><a href="#">Privacy Policy</a></li>
               <li><a href="#">Terms of Service</a></li>
             </ul>

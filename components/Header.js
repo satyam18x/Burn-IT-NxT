@@ -14,7 +14,13 @@ const Header = () => {
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
-      setUser(JSON.parse(userStr));
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error("Failed to parse user session", e);
+        localStorage.removeItem('user');
+        setUser(null);
+      }
     }
   }, [pathname]);
 
@@ -26,7 +32,12 @@ const Header = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -47,15 +58,14 @@ const Header = () => {
           <Link href="/about" className={isActive('/about')}>About</Link>
           <Link href="/programs" className={isActive('/programs')}>Programs</Link>
           <Link href="/success-stories" className={isActive('/success-stories')}>Success Stories</Link>
-          <Link href="/blog" className={isActive('/blog')}>Blog</Link>
-          <Link href="/contact" className={isActive('/contact')}>Contact</Link>
+          <Link href="/contact" className={isActive('/contact')}>Webinar</Link>
         </nav>
 
         <div className="nav-actions desktop-only">
           {user ? (
             <>
               <Link href={user.role === 'admin' ? '/admin' : '/dashboard'} className="login-link">Dashboard</Link>
-              <button onClick={handleLogout} className="btn btn-outline" style={{ border: 'none' }}>Logout</button>
+              <button onClick={handleLogout} className="btn" style={{ border: '1px solid var(--color-dark)', color: 'var(--color-dark)', padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>Logout</button>
             </>
           ) : (
             <>
@@ -78,7 +88,6 @@ const Header = () => {
           <Link href="/about" className={isActive('/about')} onClick={toggleSidebar}>About</Link>
           <Link href="/programs" className={isActive('/programs')} onClick={toggleSidebar}>Programs</Link>
           <Link href="/success-stories" className={isActive('/success-stories')} onClick={toggleSidebar}>Success Stories</Link>
-          <Link href="/blog" className={isActive('/blog')} onClick={toggleSidebar}>Blog</Link>
           <Link href="/contact" className={isActive('/contact')} onClick={toggleSidebar}>Contact</Link>
           <hr style={{ borderColor: 'rgba(0,0,0,0.1)', margin: '1rem 0' }} />
           {user ? (
