@@ -305,17 +305,6 @@ Open your browser to [http://localhost:3000](http://localhost:3000) to view the 
 
 ---
 
-### Default Accounts for Testing
-
-| Role | Username / Email | Password |
-| :--- | :--- | :--- |
-| **Administrator** | `admin@burnit.com` | `admin123` |
-| **Standard User (Athlete)** | *Create via Admin Console* | *Assigned by Admin* |
-
-> [!WARNING]
-> The default admin password `admin123` is predefined inside the SQL seed file. **Make sure to change the admin password inside the dashboard or database immediately upon deployment to staging or production.**
-
----
 
 ## 🛡️ Security & Access Control
 
